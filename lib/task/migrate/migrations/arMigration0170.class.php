@@ -31,27 +31,15 @@ class arMigration0170
 
   public function up($configuration)
   {
-    // Check if term actually exists before adding
-    $criteria = new Criteria;
-    $criteria->add(QubitTerm::TAXONOMY_ID, QubitTaxonomy::DIGITAL_OBJECT_USAGE_ID);
-    $criteria->addJoin(QubitTerm::ID, QubitTermI18n::ID);
-    $criteria->add(QubitTermI18n::NAME, 'External file');
-    $criteria->add(QubitTermI18n::CULTURE, 'en');
-
-    if (null === QubitTerm::get($criteria))
-    {
-      // Create new term for external file digital object usage
-      QubitMigrate::bumpTerm(QubitTerm::EXTERNAL_FILE_ID, $configuration);
-      $term = new QubitTerm;
-      $term->id = QubitTerm::EXTERNAL_FILE_ID;
-      $term->parentId = QubitTerm::ROOT_ID;
-      $term->taxonomyId = QubitTaxonomy::DIGITAL_OBJECT_USAGE_ID;
-      $term->name = 'Local file';
-      $term->culture = 'en';
-      $term->save();
-
-      return true;
-    }
+    // Create new term for external file digital object usage
+    QubitMigrate::bumpTerm(QubitTerm::EXTERNAL_FILE_ID, $configuration);
+    $term = new QubitTerm;
+    $term->id = QubitTerm::EXTERNAL_FILE_ID;
+    $term->parentId = QubitTerm::ROOT_ID;
+    $term->taxonomyId = QubitTaxonomy::DIGITAL_OBJECT_USAGE_ID;
+    $term->name = 'Local file';
+    $term->culture = 'en';
+    $term->save();
 
     return true;
   }
