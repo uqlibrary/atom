@@ -18,7 +18,7 @@
  */
 
 /*
- * Add new term to the levels of description taxonomy
+ * Add new term for external file digital object usage
  *
  * @package    AccesstoMemory
  * @subpackage migration
