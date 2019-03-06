@@ -216,10 +216,8 @@ EOF;
         $usageId = $digitalObject->usageId; // MASTER_ID or EXTERNAL_URI_ID or EXTERNAL_FILE_ID
     }
 
-    // If master isn't stored in AtoM, attempt to cache external resource before
-    // deleting existing derivatives
-    //
-    // An unavailable resource will result in an exception
+    // If master isn't stored in AtoM, attempt to cache external resource before deleting
+    // existing derivatives (an unavailable resource will result in an exception)
     if (!$digitalObject->masterStored($digitalObject->usageId))
     {
       $digitalObject->getLocalPath();
