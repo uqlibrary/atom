@@ -35,7 +35,10 @@ class MenuUserMenuComponent extends sfComponent
     $this->form->setValidator('email', new sfValidatorEmail(array('required' => true), array(
       'required' => $this->context->i18n->__('You must enter your email address'),
       'invalid' => $this->context->i18n->__('This isn\'t a valid email address'))));
-    $this->form->setWidget('email', new sfWidgetFormInput);
+
+    $emailWidget = new sfWidgetFormInput;
+    $emailWidget->setLabel('Username');
+    $this->form->setWidget('email', new $emailWidget);
 
     $this->form->setValidator('password', new sfValidatorString(array('required' => true), array(
       'required' => $this->context->i18n->__('You must enter your password'))));
