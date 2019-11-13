@@ -43,7 +43,7 @@ class UserLoginAction extends sfAction
     $this->form->setWidget('next', new sfWidgetFormInputHidden);
 
     // Use string validation if LDAP authentication's used as email not used to log in
-    if ($this->context->user instanceof ldapUser)
+    if ($this->context->user instanceof ADUser)
     {
       $this->form->setValidator('email', new sfValidatorString(array('required' => true), array(
         'required' => $this->context->i18n->__('You must enter your username'))));
