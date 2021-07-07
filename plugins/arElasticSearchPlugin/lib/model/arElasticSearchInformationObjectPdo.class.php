@@ -37,6 +37,7 @@ class arElasticSearchInformationObjectPdo
   protected
     $data = array(),
     $events,
+    $termParentList = array(),
     $languages = array(),
     $scripts = array();
 
@@ -63,6 +64,12 @@ class arElasticSearchInformationObjectPdo
     if (isset($options['ancestors']))
     {
       $this->ancestors = $options['ancestors'];
+    }
+
+    // Get system term id hierarchy
+    if (isset($options['terms']))
+    {
+      $this->termParentList = $options['terms'];
     }
 
     // Get inherited repository, unless a repository is set at current level
@@ -187,21 +194,19 @@ class arElasticSearchInformationObjectPdo
     if (!isset($this->ancestors))
     {
       // Find ancestors
-      $sql  = 'SELECT
-                  node.id,
-                  identifier,
-                  repository_id,
-                  slug';
+      $sql  = 'SELECT id, identifier, repository_id';
       $sql .= ' FROM '.QubitInformationObject::TABLE_NAME.' node';
-      $sql .= ' JOIN '.QubitSlug::TABLE_NAME.' slug
-                  ON node.id = slug.object_id';
       $sql .= ' WHERE node.lft < ? AND node.rgt > ?';
       $sql .= ' ORDER BY lft';
 
-      $this->ancestors = QubitPdo::fetchAll($sql, array($this->__get('lft'), $this->__get('rgt')));
+      $this->ancestors = QubitPdo::fetchAll(
+        $sql,
+        array($this->__get('lft'), $this->__get('rgt')),
+        array('fetchMode' => PDO::FETCH_ASSOC)
+      );
     }
 
-    if (!isset($this->ancestors) || 0 == count($this->ancestors))
+    if (!isset($this->ancestors) || empty($this->ancestors))
     {
       throw new sfException(sprintf("%s: Couldn't find ancestors, please make sure lft and rgt values are correct", get_class($this)));
     }
@@ -250,9 +255,9 @@ class arElasticSearchInformationObjectPdo
         {
           foreach (array_reverse($this->getAncestors()) as $item)
           {
-            if (isset($item->repository_id))
+            if (isset($item['repository_id']))
             {
-              $this->repository = QubitRepository::getById($item->repository_id);
+              $this->repository = QubitRepository::getById($item['repository_id']);
 
               break;
             }
@@ -291,7 +296,7 @@ class arElasticSearchInformationObjectPdo
 
     foreach (array_reverse($this->getAncestors()) as $ancestor)
     {
-      self::$statements['inheritedCreators']->execute(array($ancestor->id, QubitTerm::CREATION_ID));
+      self::$statements['inheritedCreators']->execute(array($ancestor['id'], QubitTerm::CREATION_ID));
 
       foreach (self::$statements['inheritedCreators']->fetchAll(PDO::FETCH_OBJ) as $creator)
       {
@@ -305,19 +310,6 @@ class arElasticSearchInformationObjectPdo
     }
 
     return $inheritedCreators;
-  }
-
-  /**
-   * Get the top level description id of this tree.
-   */
-  private function getCollectionRootId()
-  {
-    $sql = '
-      SELECT id FROM information_object
-      WHERE parent_id = ? AND lft < ? AND rgt > ?
-    ';
-
-    return QubitPdo::fetchColumn($sql, array(QubitInformationObject::ROOT_ID, $this->lft, $this->rgt));
   }
 
   public function getLevelOfDescription($culture)
@@ -408,14 +400,18 @@ class arElasticSearchInformationObjectPdo
     }
 
     $identifiers = array();
-    $this->ancestors = $this->getAncestors();
 
-    foreach (array_merge(is_array($this->ancestors) ? $this->ancestors : array(), array($this)) as $item)
+    foreach ($this->getAncestors() as $item)
     {
-      if (isset($item->identifier))
+      if (isset($item['identifier']))
       {
-        $identifiers[] = $item->identifier;
+        $identifiers[] = $item['identifier'];
       }
+    }
+
+    if (isset($this->identifier))
+    {
+      $identifiers[] = $this->identifier;
     }
 
     $refcode .= implode(sfConfig::get('app_separator_character', '-'), $identifiers);
@@ -612,32 +608,77 @@ class arElasticSearchInformationObjectPdo
   }
 
   /*
-   * Get related terms and its ancestors
+   * Prepare term query.
+   */
+  protected function prepareRelatedTermsQuery()
+  {
+    if (!isset(self::$statements['relatedTerms']))
+    {
+      $sql  = 'SELECT
+                  DISTINCT current.id';
+      $sql .= ' FROM '.QubitObjectTermRelation::TABLE_NAME.' otr';
+      $sql .= ' JOIN '.QubitTerm::TABLE_NAME.' current
+                  ON otr.term_id = current.id';
+      $sql .= ' WHERE otr.object_id = :id
+                  AND current.taxonomy_id = :taxonomyId';
+
+      self::$statements['relatedTerms'] = self::$conn->prepare($sql);
+    }
+  }
+
+  /*
+   * Get related terms plus any ancestors
    */
   protected function getRelatedTerms($typeId)
   {
-    $sql  = 'SELECT
-                DISTINCT term.id,
-                term.taxonomy_id,
-                term.source_culture,
-                slug.slug,
-                i18n.name';
-    $sql .= ' FROM '.QubitObjectTermRelation::TABLE_NAME.' otr';
-    $sql .= ' JOIN '.QubitTerm::TABLE_NAME.' current
-                ON otr.term_id = current.id';
-    $sql .= ' JOIN '.QubitTerm::TABLE_NAME.' term
-                ON term.lft <= current.lft AND term.rgt >= current.rgt';
-    $sql .= ' JOIN '.QubitTermI18n::TABLE_NAME.' i18n
-                ON term.id = i18n.id';
-    $sql .= ' JOIN '.QubitSlug::TABLE_NAME.' slug
-                ON term.id = slug.object_id';
-    $sql .= ' WHERE otr.object_id = ?
-               AND term.taxonomy_id = ?';
+    $relatedTerms = array();
 
-    self::$statements['relatedTerms'] = self::$conn->prepare($sql);
-    self::$statements['relatedTerms']->execute(array($this->__get('id'), $typeId));
+    $this->prepareRelatedTermsQuery();
 
-    return self::$statements['relatedTerms']->fetchAll(PDO::FETCH_OBJ);
+    self::$statements['relatedTerms']->execute(array(':id' => $this->__get('id'), ':taxonomyId' => $typeId));
+
+    // Get directly related terms.
+    $rows = self::$statements['relatedTerms']->fetchAll(PDO::FETCH_ASSOC);
+
+    if (0 == count($rows))
+    {
+      return $relatedTerms;
+    }
+
+    // Iterate over each directly related term, adding all ancestors of each
+    foreach($rows as $row)
+    {
+      $relatedTerms = array_merge($relatedTerms, $this->recursivelyGetParentTerms($row['id']));
+    }
+
+    $relatedTerms = array_unique($relatedTerms);
+
+    return $relatedTerms;
+  }
+
+  /**
+   * Recursively find all parent terms for any given term. Subject, Place and
+   * Genre terms are preloaded in array $this->termParentList. The import array $ids is
+   * appended to for every parent that is added on each recursive call.
+   *
+   * @param array $id  The term id to find the parents for.
+   * @return array  Array with directly related term first, followed by
+   *                any parents found, in child to top parent order.
+   */
+  private function recursivelyGetParentTerms($id)
+  {
+    if (null === $parent = $this->termParentList[$id])
+    {
+      return array($id);
+    }
+
+    // Do not include root term id.
+    if (QubitTerm::ROOT_ID == $parent)
+    {
+      return array($id);
+    }
+
+    return array_merge(array($id), $this->recursivelyGetParentTerms($parent));
   }
 
   /*
@@ -645,18 +686,10 @@ class arElasticSearchInformationObjectPdo
    */
   protected function getDirectlyRelatedTerms($typeId)
   {
-    $sql  = 'SELECT
-                DISTINCT current.id';
-    $sql .= ' FROM '.QubitObjectTermRelation::TABLE_NAME.' otr';
-    $sql .= ' JOIN '.QubitTerm::TABLE_NAME.' current
-                ON otr.term_id = current.id';
-    $sql .= ' WHERE otr.object_id = ?
-                AND current.taxonomy_id = ?';
+    $this->prepareRelatedTermsQuery();
+    self::$statements['relatedTerms']->execute(array(':id' => $this->__get('id'), ':taxonomyId' => $typeId));
 
-    self::$statements['relatedTerms'] = self::$conn->prepare($sql);
-    self::$statements['relatedTerms']->execute(array($this->__get('id'), $typeId));
-
-    return self::$statements['relatedTerms']->fetchAll(PDO::FETCH_OBJ);
+    return self::$statements['relatedTerms']->fetchAll(PDO::FETCH_ASSOC);
   }
 
   protected function getLanguagesAndScripts()
@@ -791,31 +824,6 @@ class arElasticSearchInformationObjectPdo
     {
       return $do->getDigitalObjectAltText();
     }
-  }
-
-  public function getMaterialTypeId()
-  {
-    return $this->getObjectTermRelations('materialType', QubitTaxonomy::MATERIAL_TYPE_ID);
-  }
-
-  protected function getObjectTermRelations($statementType, $taxonomyId)
-  {
-    if (!isset(self::$statements[$statementType]))
-    {
-      $sql  = 'SELECT term.id';
-      $sql .= ' FROM '.QubitObjectTermRelation::TABLE_NAME.' otr';
-      $sql .= ' JOIN '.QubitTerm::TABLE_NAME.' term
-                  ON otr.term_id = term.id';
-      $sql .= ' WHERE object_id = ?';
-      $sql .= ' AND term.taxonomy_id = '.$taxonomyId;
-
-      self::$statements[$statementType] = self::$conn->prepare($sql);
-    }
-
-    self::$statements[$statementType]->execute(array(
-      $this->__get('id')));
-
-    return self::$statements[$statementType]->fetchAll(PDO::FETCH_OBJ);
   }
 
   public function getStorageNames()
@@ -1145,7 +1153,7 @@ class arElasticSearchInformationObjectPdo
 
     $serialized['id'] = $this->id;
     $serialized['slug'] = $this->slug;
-
+    $serialized['parentId'] = $this->parent_id;
     $serialized['identifier'] = $this->identifier;
     $serialized['referenceCode'] = $this->getReferenceCode();
     $serialized['referenceCodeWithoutCountryAndRepo'] = $this->getReferenceCode(false);
@@ -1161,12 +1169,7 @@ class arElasticSearchInformationObjectPdo
     }
 
     // NB: this will include the ROOT_ID
-    foreach ($this->getAncestors() as $ancestor)
-    {
-      $serialized['ancestors'][] = $ancestor->id;
-    }
-
-    $serialized['parentId'] = $this->ancestors[count($this->ancestors)-1]->id;
+    $serialized['ancestors'] = array_column($this->getAncestors(), 'id');
 
     // NB: this should be an ordered array
     foreach ($this->getChildren() as $child)
@@ -1190,9 +1193,9 @@ class arElasticSearchInformationObjectPdo
     }
 
     // Material type
-    foreach ($this->getMaterialTypeId() as $item)
+    foreach ($this->getDirectlyRelatedTerms(QubitTaxonomy::MATERIAL_TYPE_ID) as $item)
     {
-      $serialized['materialTypeId'][] = $item->id;
+      $serialized['materialTypeId'][] = $item['id'];
     }
 
     // Make sure that media_type_id gets a value in case that one was not
@@ -1222,6 +1225,25 @@ class arElasticSearchInformationObjectPdo
     foreach ($this->events as $event)
     {
       $serialized['dates'][] = arElasticSearchEvent::serialize($event);
+
+      // The dates indexed above are nested objects and that complicates sorting.
+      // Additionally, we only show the first populated dates on the search
+      // results. Indexing the first populated dates on different fields makes
+      // sorting easier and more intuitive.
+      if (isset($serialized['startDateSort']) || isset($serialized['endDateSort']))
+      {
+        continue;
+      }
+
+      if (!empty($event->start_date))
+      {
+        $serialized['startDateSort'] = arElasticSearchPluginUtil::normalizeDateWithoutMonthOrDay($event->start_date);
+      }
+
+      if (!empty($event->end_date))
+      {
+        $serialized['endDateSort'] = arElasticSearchPluginUtil::normalizeDateWithoutMonthOrDay($event->end_date, true);
+      }
     }
 
     // Transcript
@@ -1251,25 +1273,25 @@ class arElasticSearchInformationObjectPdo
     // Places
     foreach ($this->getRelatedTerms(QubitTaxonomy::PLACE_ID) as $item)
     {
-      $node = new arElasticSearchTermPdo($item->id);
+      $node = new arElasticSearchTermPdo($item);
       $serialized['places'][] = $node->serialize();
     }
 
     foreach ($this->getDirectlyRelatedTerms(QubitTaxonomy::PLACE_ID) as $item)
     {
-      $serialized['directPlaces'][] = $item->id;
+      $serialized['directPlaces'][] = $item['id'];
     }
 
     // Subjects
     foreach ($this->getRelatedTerms(QubitTaxonomy::SUBJECT_ID) as $item)
     {
-      $node = new arElasticSearchTermPdo($item->id);
+      $node = new arElasticSearchTermPdo($item);
       $serialized['subjects'][] = $node->serialize();
     }
 
     foreach ($this->getDirectlyRelatedTerms(QubitTaxonomy::SUBJECT_ID) as $item)
     {
-      $serialized['directSubjects'][] = $item->id;
+      $serialized['directSubjects'][] = $item['id'];
     }
 
     // Name access points
@@ -1282,13 +1304,13 @@ class arElasticSearchInformationObjectPdo
     // Genres
     foreach ($this->getRelatedTerms(QubitTaxonomy::GENRE_ID) as $item)
     {
-      $node = new arElasticSearchTermPdo($item->id);
+      $node = new arElasticSearchTermPdo($item);
       $serialized['genres'][] = $node->serialize();
     }
 
     foreach ($this->getDirectlyRelatedTerms(QubitTaxonomy::GENRE_ID) as $item)
     {
-      $serialized['directGenres'][] = $item->id;
+      $serialized['directGenres'][] = $item['id'];
     }
 
     // Creators
@@ -1384,12 +1406,12 @@ class arElasticSearchInformationObjectPdo
     $serialized['sourceCulture'] = $this->source_culture;
     $serialized['i18n'] = arElasticSearchModelBase::serializeI18ns($this->id, array('QubitInformationObject'));
 
-    // Add "Part of" title if this isn't a top level description
-    $collectionRootId = $this->getCollectionRootId();
-
-    if ($collectionRootId && $collectionRootId != $this->id)
+    // Add "Part of" information if this isn't a top level description
+    if (count($this->ancestors) > 1)
     {
+      $collectionRootId = $this->ancestors[1]['id'];
       $rootSlug = QubitPdo::fetchColumn('SELECT slug FROM slug WHERE object_id=?', array($collectionRootId));
+
       if (!$rootSlug)
       {
         throw new sfException("No slug found for information object $collectionRootId");

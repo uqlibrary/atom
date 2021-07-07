@@ -74,9 +74,6 @@ EOF;
       }
     }
 
-    $databaseManager = new sfDatabaseManager($this->configuration);
-    $conn = $databaseManager->getDatabase('propel')->getConnection();
-
     $insertSql = new sfPropelInsertSqlTask($this->dispatcher, $this->formatter);
     $insertSql->setCommandApplication($this->commandApplication);
     $insertSql->setConfiguration($this->configuration);
@@ -107,18 +104,25 @@ EOF;
       }
     }
 
-    $configuration = ProjectConfiguration::getApplicationConfiguration($options['application'], $options['env'], false);
-    $sf_context = sfContext::createInstance($configuration);
+    $configuration = ProjectConfiguration::getApplicationConfiguration(
+      $options['application'], $options['env'], false
+    );
+    sfContext::createInstance($configuration);
 
     QubitSearch::disable();
+
+    sfInstall::modifySql();
 
     sfInstall::loadData();
 
     QubitSearch::enable();
 
-    // Flush search index
-    QubitSearch::getInstance()->flush();
-    $this->logSection('purge', 'The search index has been deleted.');
+    // Populate config with settings
+    sfConfig::add(QubitSetting::getSettingsArray());
+
+    // Recreate search index
+    QubitSearch::getInstance()->populate();
+    $this->logSection('purge', 'The search index has been recreated.');
 
     // set, or prompt for, site title configuration information
     $siteTitle = (isset($options['title'])) ? $options['title'] : '';
@@ -149,8 +153,6 @@ EOF;
     $this->createSetting('siteTitle', $siteTitle);
     $this->createSetting('siteDescription', $siteDescription);
     $this->createSetting('siteBaseUrl', $siteBaseUrl);
-
-    print "\n";
 
     addSuperuserTask::addSuperUser($options['username'], $options);
 

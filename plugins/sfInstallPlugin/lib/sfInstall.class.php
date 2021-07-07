@@ -426,13 +426,13 @@ class sfInstall
 
     $insertSql = new sfPropelInsertSqlTask($dispatcher, $formatter);
     $insertSql->run($arguments, $options);
+
+    self::modifySql();
   }
 
   public static function loadData()
   {
     QubitSearch::disable();
-
-    self::modifySql();
 
     $object = new QubitInformationObject;
     $object->id = QubitInformationObject::ROOT_ID;
@@ -524,6 +524,9 @@ class sfInstall
 
   public static function populateSearchIndex()
   {
+    // Populate config with settings
+    sfConfig::add(QubitSetting::getSettingsArray());
+
     QubitSearch::enable();
     QubitSearch::getInstance()->populate();
   }
