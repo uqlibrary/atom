@@ -437,6 +437,8 @@ class QubitInformationObject extends BaseInformationObject
         }
 
         $criteria->addAscendingOrderByColumn(QubitObject::UPDATED_AT);
+	// Fix duplicates in oai when multiple update_date are the same.
+        $criteria->addAscendingOrderByColumn(QubitObject::ID);
 
         if (empty($options['offset'])) {
             $options['offset'] = 0;
