@@ -78,7 +78,7 @@
     <div class="row">
       <div class="span4">
         <?php echo get_component('search', 'inlineSearch', array(
-          'label' => __('Search %1%', array('%1%' => strtolower(sfConfig::get('app_ui_label_repository')))))) ?>
+          'label' => __('Search'))) ?>
       </div>
 
       <?php echo get_partial('default/viewPicker', array('view' => $view, 'cardView' => $cardView,
