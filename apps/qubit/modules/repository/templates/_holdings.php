@@ -5,7 +5,7 @@
 <form class="sidebar-search" action="<?php echo url_for(array('module' => 'informationobject', 'action' => 'browse')) ?>">
   <input type="hidden" name="repos" value="<?php echo $resource->id ?>">
   <div class="input-prepend input-append">
-    <input type="text" name="query" placeholder="<?php echo __('Search holdings') ?>">
+    <input type="text" name="query" placeholder="<?php echo __('Search') ?>">
     <button class="btn" type="submit">
       <i class="fa fa-search"></i>
     </button>
