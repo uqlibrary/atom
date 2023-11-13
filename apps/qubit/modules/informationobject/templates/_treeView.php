@@ -8,7 +8,7 @@
   <?php endif; ?>
   <li <?php echo ($treeviewType != 'sidebar') ? 'class="active"' : '' ?>>
     <a href="#treeview-search" data-toggle="#treeview-search">
-      <?php echo __('Quick search') ?>
+      <?php echo __('Search this description') ?>
     </a>
   </li>
 </ul>
