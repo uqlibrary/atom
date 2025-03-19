@@ -155,9 +155,10 @@ class QubitActor extends BaseActor
     
     // Added by rferris to allow changing authority record slugs 
     $newQubitSlug = QubitSlug::getByObjectId($this->id);
+
     if (isset($newQubitSlug)) {
         $slug = QubitSlug::slugify($this->__get('authorizedFormOfName', array('sourceCulture' => true)));
-        if ($slug !== $this->slug) {
+        if ((! empty($slug)) && ($slug !== $this->slug)) {
             $this->slug = $slug;
             $newQubitSlug->slug = $slug;
             $newQubitSlug->save();
