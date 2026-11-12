@@ -39,3 +39,4 @@ tasks:
     desc: Perform a normal release build
     cmds:
       - docker run -t --rm -e OUT_USER=$(id -u) -e OUT_GROUP=$(id -g) -v $(pwd):/atom/src:ro -v $(pwd)/build:/build --entrypoint=/bin/bash atom:latest
+

@@ -11,6 +11,6 @@ VERSION="$(echo $FILENAME | sed 's/\.tar\.gz$//' | sed 's/^atom-//')"
 echo "Releasing $VERSION"
 
 gh release create $VERSION $1 \
-  --title "$VERSION" \
-  --notes "Release $VERSION" \
-  --target main
+  --title "$VERSION release" \
+  --generate-notes \
+  --target qa/2.x

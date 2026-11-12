@@ -103,7 +103,7 @@ file_put_contents(_ATOM_DIR.'/apps/qubit/config/gearman.yml', $gearman_yml);
 //
 
 if (!file_exists(_ATOM_DIR.'/apps/qubit/config/app.yml')) {
-    $parts = get_host_and_port($CONFIG['atom.memcached_host'], $CONFIG["atom.memcached_port"]);
+    $parts = get_host_and_port($CONFIG['atom.memcached_host'], $CONFIG['atom.memcached_port']);
     $app_yml = <<<EOT
 all:
   uq_reusable_components: {$CONFIG["atom.uq_reusable_components"]}
