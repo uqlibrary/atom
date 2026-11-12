@@ -86,9 +86,9 @@ all:
       prefix: %SF_APP_DIR%/template
 
   user:
-    class: myUser
+    class: adUser
     param:
-      timeout: 1800 # Session timeout in seconds
+      timeout: 80000 # Session timeout in seconds
 
   logger:
     class: sfAggregateLogger

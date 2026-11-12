@@ -78,11 +78,11 @@ class SettingsMenuComponent extends sfComponent
                 'label' => $i18n->__('Inventory'),
                 'action' => 'inventory',
             ],
-            // Only show LDAP authentication settings if LDAP authentication's used
+            // Only show AD authentication settings if AD authentication's used
             [
-                'label' => $i18n->__('LDAP Authentication'),
-                'action' => 'ldap',
-                'hide' => !($this->context->user instanceof ldapUser),
+                'label' => $i18n->__('AD Authentication'),
+                'action' => 'ad',
+                'hide' => !($this->context->user instanceof adUser),
             ],
             [
                 'label' => $i18n->__('Markdown'),

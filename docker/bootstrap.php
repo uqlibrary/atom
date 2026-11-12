@@ -54,7 +54,7 @@ $CONFIG = [
     'php.post_max_size' => getenv_default('ATOM_PHP_POST_MAX_SIZE', '72M'),
     'php.upload_max_filesize' => getenv_default('ATOM_PHP_UPLOAD_MAX_FILESIZE', '64M'),
     'php.max_file_uploads' => getenv_default('ATOM_PHP_MAX_FILE_UPLOADS', '20'),
-    'php.date.timezone' => getenv_default('ATOM_PHP_DATE_TIMEZONE', 'America/Vancouver'),
+    'php.date.timezone' => getenv_default('ATOM_PHP_DATE_TIMEZONE', 'Australia/Brisbane'),
 ];
 
 //
