@@ -56,3 +56,4 @@ activate-oidc-plugin
 
 # UQL
 devhome/
+package.xml

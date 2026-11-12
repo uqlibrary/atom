@@ -10,7 +10,7 @@ tasks:
     cmds:
       - docker build -t atomdev -f dev.Dockerfile .
 
-  enter-container:
+  enter-devcontainer:
     desc: Run a Docker container for the development container
     cmds:
       - docker run -it --rm  --user $(id -u):$(id -g) -v $(pwd):/atom/src -e HOME=/atom/src/devhome --entrypoint=/bin/sh atomdev
@@ -24,3 +24,18 @@ tasks:
     desc: Audit project dependencies
     cmds:
       - docker run -it --rm --user $(id -u):$(id -g) -v .:/atom/src -e HOME=/atom/src/devhome --entrypoint=/bin/sh atomdev -c "./tools/audit-deps.sh"
+
+  build-release-container:
+    desc: Perform a release build
+    cmds:
+      - docker build -t atom:latest -f Dockerfile .
+
+  build-release-file:
+    desc: Perform a normal release build
+    cmds:
+      - docker run -it --rm -e OUT_USER=$(id -u) -e OUT_GROUP=$(id -g) -v $(pwd):/atom/src:ro -v $(pwd)/build:/build --entrypoint=/bin/bash atom:latest -c "./tools/build-release.sh"
+
+  debug-release-file:
+    desc: Perform a normal release build
+    cmds:
+      - docker run -t --rm -e OUT_USER=$(id -u) -e OUT_GROUP=$(id -g) -v $(pwd):/atom/src:ro -v $(pwd)/build:/build --entrypoint=/bin/bash atom:latest
