@@ -1,5 +1,18 @@
 <div class="row g-3 mb-3 masonry">
-
+<?php function checkCulture($pageText)
+{
+    $cultureStatements = [
+        "Content advice: Aboriginal and Torres Strait Islander",
+        "Cultural advice: Aboriginal and Torres Strait Islander",
+        "Content advice: Aboriginal, Torres Strait Islander",
+        "Cultural advice: Aboriginal, Torres Strait Islander",
+    ];
+    return array_filter($cultureStatements, function ($statement) use (
+        $pageText,
+    ) {
+        return str_contains($pageText, $statement);
+    });
+} ?>
 <?php foreach ($pager->getResults() as $hit) { ?>
   <?php $doc = $hit->getData(); ?>
   <?php
@@ -46,7 +59,15 @@
           <?php echo render_title_with_highlights($title); ?>
         </a>
       <?php } ?>
-
+      <?php if (
+          null !==
+              ($scopeAndContent = get_search_i18n($doc, "scopeAndContent", [
+                  "culture" => $selectedCulture,
+              ])) &&
+          checkCulture($scopeAndContent)
+      ) { ?>
+        <div class="customIndicatorCulturalAdvice"></div>
+      <?php } ?>
       <div class="card-body">
         <div class="card-text d-flex align-items-start gap-2">
           <span><?php echo render_title_with_highlights($title); ?></span>
