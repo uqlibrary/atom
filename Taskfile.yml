@@ -1,0 +1,26 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Default task
+    cmds:
+      - go-task --list
+  build-devcontainer:
+    desc: Build a Docker image for the development container
+    cmds:
+      - docker build -t atomdev -f dev.Dockerfile .
+
+  enter-container:
+    desc: Run a Docker container for the development container
+    cmds:
+      - docker run -it --rm  --user $(id -u):$(id -g) -v $(pwd):/atom/src -e HOME=/atom/src/devhome --entrypoint=/bin/sh atomdev
+
+  update-deps:
+    desc: Update project dependencies
+    cmds:
+      - docker run --rm --user $(id -u):$(id -g) -v .:/atom/src -e HOME=/atom/src/devhome --entrypoint=/bin/sh atomdev -c "./tools/update-deps.sh"
+
+  audit-deps:
+    desc: Audit project dependencies
+    cmds:
+      - docker run -it --rm --user $(id -u):$(id -g) -v .:/atom/src -e HOME=/atom/src/devhome --entrypoint=/bin/sh atomdev -c "./tools/audit-deps.sh"
