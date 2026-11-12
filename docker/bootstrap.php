@@ -42,17 +42,22 @@ $CONFIG = [
     'atom.development_mode' => filter_var(getenv_default('ATOM_DEVELOPMENT_MODE', false), FILTER_VALIDATE_BOOLEAN),
     'atom.coverage' => filter_var(getenv_default('ATOM_COVERAGE', false), FILTER_VALIDATE_BOOLEAN),
     'atom.elasticsearch_host' => getenv_or_fail('ATOM_ELASTICSEARCH_HOST'),
+    'atom.elasticsearch_port' => getenv_default('ATOM_ELASTICSEARCH_PORT', '9200'),
+    'atom.elasticsearch_index' => getenv_default('ATOM_ELASTICSEARCH_INDEX', 'atom'),
     'atom.memcached_host' => getenv_or_fail('ATOM_MEMCACHED_HOST'),
+    'atom.memcached_port' => getenv_default('ATOM_MEMCACHED_PORT', '11211'),
     'atom.gearmand_host' => getenv_or_fail('ATOM_GEARMAND_HOST'),
     'atom.mysql_dsn' => getenv_or_fail('ATOM_MYSQL_DSN'),
     'atom.mysql_username' => getenv_or_fail('ATOM_MYSQL_USERNAME'),
     'atom.mysql_password' => getenv_or_fail('ATOM_MYSQL_PASSWORD'),
     'atom.debug_ip' => getenv_default('ATOM_DEBUG_IP', ''),
+    'atom.uq_reusable_components' => getenv_default('UQ_REUSABLE_COMPONENTS', ''),
+    'fpm.listen_port' => getenv_default('ATOM_FPM_LISTEN_PORT', '9000'),
     'php.max_execution_time' => getenv_default('ATOM_PHP_MAX_EXECUTION_TIME', '120'),
     'php.max_input_time' => getenv_default('ATOM_PHP_MAX_INPUT_TIME', '120'),
-    'php.memory_limit' => getenv_default('ATOM_PHP_MEMORY_LIMIT', '512M'),
-    'php.post_max_size' => getenv_default('ATOM_PHP_POST_MAX_SIZE', '72M'),
-    'php.upload_max_filesize' => getenv_default('ATOM_PHP_UPLOAD_MAX_FILESIZE', '64M'),
+    'php.memory_limit' => getenv_default('ATOM_PHP_MEMORY_LIMIT', '2048M'),
+    'php.post_max_size' => getenv_default('ATOM_PHP_POST_MAX_SIZE', '128M'),
+    'php.upload_max_filesize' => getenv_default('ATOM_PHP_UPLOAD_MAX_FILESIZE', '500M'),
     'php.max_file_uploads' => getenv_default('ATOM_PHP_MAX_FILE_UPLOADS', '20'),
     'php.date.timezone' => getenv_default('ATOM_PHP_DATE_TIMEZONE', 'Australia/Brisbane'),
 ];
@@ -98,11 +103,12 @@ file_put_contents(_ATOM_DIR.'/apps/qubit/config/gearman.yml', $gearman_yml);
 //
 
 if (!file_exists(_ATOM_DIR.'/apps/qubit/config/app.yml')) {
-    $parts = get_host_and_port($CONFIG['atom.memcached_host'], 11211);
+    $parts = get_host_and_port($CONFIG['atom.memcached_host'], $CONFIG["atom.memcached_port"]);
     $app_yml = <<<EOT
 all:
+  uq_reusable_components: {$CONFIG["atom.uq_reusable_components"]}
   upload_limit: -1
-  download_timeout: 10
+  download_timeout: 300
   cache_engine: sfMemcacheCache
   cache_engine_param:
     host: {$parts['host']}
@@ -115,11 +121,11 @@ all:
   csp:
     response_header: Content-Security-Policy
     directives: >
-      default-src 'self';
+      default-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.library.uq.edu.au/ https://fonts.gstatic.com https://fonts.googleapis.com;
       font-src 'self' https://fonts.gstatic.com;
       form-action 'self';
-      img-src 'self' https://*.googleapis.com https://*.gstatic.com *.google.com  *.googleusercontent.com data: https://www.gravatar.com/avatar/ https://*.google-analytics.com https://*.googletagmanager.com blob:;
-      script-src 'self' https://*.googletagmanager.com 'nonce' https://*.googleapis.com https://*.gstatic.com *.google.com https://*.ggpht.com *.googleusercontent.com blob:;
+      img-src 'self' data: https://static.uq.net.au https://web.library.uq.edu.au https://*.googleapis.com https://*.gstatic.com *.google.com *.googleusercontent.com https://www.gravatar.com/avatar/ https://*.google-analytics.com https://*.googletagmanager.com blob:;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.library.uq.edu.au/ https://*.googletagmanager.com https://*.googleapis.com https://*.gstatic.com *.google.com https://*.ggpht.com *.googleusercontent.com blob:;
       style-src 'self' 'nonce' https://fonts.googleapis.com;
       worker-src 'self' blob:;
       connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.googleapis.com *.google.com https://*.gstatic.com  data: blob:;
@@ -135,7 +141,7 @@ EOT;
 //
 
 if (!file_exists(_ATOM_DIR.'/apps/qubit/config/factories.yml')) {
-    $parts = get_host_and_port($CONFIG['atom.memcached_host'], 11211);
+    $parts = get_host_and_port($CONFIG['atom.memcached_host'], $CONFIG['atom.memcached_port']);
     $factories_yml = <<<EOT
 prod:
   storage:
@@ -178,12 +184,15 @@ EOT;
 // /config/search.yml
 //
 
-$parts = get_host_and_port($CONFIG['atom.elasticsearch_host'], 9200);
+$parts = get_host_and_port($CONFIG['atom.elasticsearch_host'], $CONFIG['atom.elasticsearch_port']);
+$es_index = $CONFIG['atom.elasticsearch_index'];
 $search_yml = <<<EOT
 all:
   server:
     host: {$parts['host']}
     port: {$parts['port']}
+  index:
+    name: {$es_index}
 
 EOT;
 
@@ -306,8 +315,8 @@ file_put_contents(_ETC_DIR.'/php/php.ini', $php_ini);
 //
 // fpm ini
 //
-
-$fpm_ini = <<<'EOT'
+$fpm_port = '[::]:' . $CONFIG['fpm.listen_port'];
+$fpm_ini = <<<EOT
 [global]
 error_log = /proc/self/fd/2
 daemonize = no
@@ -318,7 +327,7 @@ clear_env = no
 catch_workers_output = yes
 user = root
 group = root
-listen = [::]:9000
+listen = {$fpm_port}
 pm = dynamic
 pm.max_children = 5
 pm.start_servers = 2
