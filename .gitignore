@@ -55,4 +55,4 @@ cypress.env.json
 activate-oidc-plugin
 
 # UQL
-devhome
+devhome/
