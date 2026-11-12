@@ -10,9 +10,9 @@
       </header>
       <metadata>
         <?php if ('oai_dc' == $metadataPrefix && !arOaiPluginComponent::checkDisplayCachedMetadata($record, $metadataPrefix)) { ?>
-          <?php echo get_component('sfDcPlugin', 'dc', ['resource' => $record]); ?>
+          <?php echo trim(preg_replace('/\s\s+/', ' ', get_component('sfDcPlugin', 'dc', ['resource' => $record]))); ?>
         <?php } else { ?>
-          <?php arOaiPluginComponent::includeCachedMetadata($record, $metadataPrefix); ?>
+          <?php echo trim(preg_replace('/\s\s+/', ' ', arOaiPluginComponent::includeCachedMetadata($record, $metadataPrefix))); ?>
         <?php } ?>
       </metadata>
       <?php if (count($record->digitalObjectsRelatedByobjectId)) { ?>
