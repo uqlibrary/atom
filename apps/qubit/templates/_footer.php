@@ -16,5 +16,9 @@
       data-read-less-text="<?php echo __('Read less'); ?>">
     </div>
   </div>
+  <?php $uqComp = sfConfig::get('app_uq_reusable_components', ''); ?>
+  <?php if (!empty($uqComp)) { ?>
+    <script type="text/javascript" defer="defer" src="<?php echo $uqComp; ?>"></script>
+  <?php } ?>
 
 </footer>
