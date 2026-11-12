@@ -122,6 +122,19 @@ class QubitActor extends BaseActor
             $this->parentId = QubitRepository::ROOT_ID;
         }
 
+        // Added by rferris to allow changing authority record slugs 
+        $newQubitSlug = QubitSlug::getByObjectId($this->id);
+
+        if (isset($newQubitSlug)) {
+            $slug = QubitSlug::slugify($this->__get('authorizedFormOfName', array('sourceCulture' => true)));
+            if ((! empty($slug)) && ($slug !== $this->slug)) {
+                $this->slug = $slug;
+                $newQubitSlug->slug = $slug;
+                $newQubitSlug->save();
+            }
+        }
+        // End rferris patch
+
         // Save new digital objects
         // TODO Allow adding additional digital objects as derivatives
         foreach ($this->digitalObjectsRelatedByobjectId as $item) {
